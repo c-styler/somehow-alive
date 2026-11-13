@@ -35,6 +35,7 @@ func _process(delta: float) -> void:
 	_update_modulate()
 
 	hud.set_time_text(get_time_string())
+	game_hour = start_hour
 
 
 func _advance_time(delta: float) -> void:
