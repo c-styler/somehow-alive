@@ -2,6 +2,7 @@
 
 [ext_resource type="Texture2D" uid="uid://2rknbyfmlc64" path="res://Assets/Astronaut/walk_sheet.png" id="1_oxbot"]
 [ext_resource type="Script" uid="uid://b43nm0qs3xc7l" path="res://Scripts/astronaut.gd" id="1_r5njw"]
+[ext_resource type="Script" uid="uid://ctkb5j11rljny" path="res://Scripts/ground_shadow.gd" id="2_shadow"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_r5njw"]
 atlas = ExtResource("1_oxbot")
@@ -753,6 +754,11 @@ size = Vector2(20, 21.515152)
 scale = Vector2(0.4, 0.4)
 floor_constant_speed = true
 script = ExtResource("1_r5njw")
+
+[node name="Shadow" type="Node2D" parent="." unique_id=1301992908]
+position = Vector2(0, 7.4999995)
+script = ExtResource("2_shadow")
+radius = 48.0
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=371973847]
 position = Vector2(0.50000185, -51.999992)

@@ -3,11 +3,21 @@ extends Node2D
 @export var world: WorldGrid
 @export var player: Node # whatever your player type is
 @export var color := Color(1, 1, 1, 0.9)
+## Lives in the world (so the player draws over it), but cancels out the day/night tint
+## by applying the inverse of the CanvasModulate color, so it stays full brightness.
+@export var canvas_modulate: CanvasModulate
 
 var tween: Tween
 
 func _ready() -> void:
 	visible = false
+
+func _process(_delta: float) -> void:
+	if canvas_modulate == null or not visible:
+		return
+	var c := canvas_modulate.color
+	# self_modulate, so the tween can keep using modulate.a for the fade
+	self_modulate = Color(1.0 / maxf(c.r, 0.05), 1.0 / maxf(c.g, 0.05), 1.0 / maxf(c.b, 0.05))
 
 func _draw() -> void:
 	var half := Vector2(world.astar.cell_size) / 2.0

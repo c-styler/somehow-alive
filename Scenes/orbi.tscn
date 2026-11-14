@@ -1,0 +1,14 @@
+[gd_scene format=3 uid="uid://dfg340p6pfdsr"]
+
+[ext_resource type="Script" uid="uid://cmjmxdjynv7ol" path="res://Scripts/orbi_companion.gd" id="1_orbi"]
+[ext_resource type="Texture2D" uid="uid://d1f5kjiywb86b" path="res://Assets/Orbi/orbi.png" id="2_orbi"]
+
+[node name="Orbi" type="Node2D" unique_id=289928547]
+script = ExtResource("1_orbi")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1039072856]
+texture_filter = 1
+position = Vector2(0, -34)
+scale = Vector2(0.12, 0.12)
+texture = ExtResource("2_orbi")
+offset = Vector2(25, 55)

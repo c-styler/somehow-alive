@@ -7,11 +7,10 @@
 [sub_resource type="Theme" id="Theme_fo5ed"]
 default_font = ExtResource("1_e0onf")
 
-[node name="HUD" type="CanvasLayer" unique_id=944522022 node_paths=PackedStringArray("location", "time_text")]
+[node name="HUD" type="CanvasLayer" unique_id=944522022 node_paths=PackedStringArray("location")]
 layer = 3
 script = ExtResource("1_fccik")
 location = NodePath("Location")
-time_text = NodePath("Time")
 
 [node name="Location" type="Label" parent="." unique_id=356323486]
 modulate = Color(0.75686276, 0.26666668, 0.05490196, 1)
@@ -22,22 +21,3 @@ offset_bottom = 27.0
 theme = SubResource("Theme_fo5ed")
 theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.26666668)
 text = "Outside"
-
-[node name="Controls" type="Label" parent="." unique_id=1478081080]
-anchors_preset = 4
-anchor_top = 0.5
-anchor_bottom = 0.5
-offset_left = 1.0
-offset_top = -100.0
-offset_right = 41.0
-offset_bottom = -77.0
-grow_vertical = 2
-theme_override_fonts/font = ExtResource("3_bjfho")
-text = "Toggle Helmet Lights: K"
-
-[node name="Time" type="Label" parent="." unique_id=1111000286]
-offset_left = 8.0
-offset_top = 32.0
-offset_right = 100.0
-offset_bottom = 55.0
-text = "HOUR 8:00"

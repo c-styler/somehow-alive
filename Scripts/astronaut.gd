@@ -6,9 +6,15 @@ signal destination_set(cell: Vector2i)
 @export var tile_map: TileMapLayer
 @export var world: WorldGrid
 @export var speed := 120.0 # pixels per second
+@export var run_multiplier := 1.6 # speed boost while holding right mouse button
+
+## Hold right mouse to hurry (ignored while a task/dialogue has the input).
+var is_running: bool:
+	get: return not input_locked and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
 
 const INTERACT_MASK := 1 << 2 # physics layer 3
 var hovered: Interactable
+var input_locked := false # set while a task/minigame owns the mouse
 
 var tween: Tween
 
@@ -28,21 +34,23 @@ func _ready() -> void:
 	global_position = world.cell_to_world(current_tile)
 	facing = Vector2.DOWN
 
+## Instantly moves to a cell, dropping any walk or pending interaction.
+func teleport(cell: Vector2i) -> void:
+	path.clear()
+	clear_pending()
+	current_tile = cell
+	global_position = world.cell_to_world(cell)
+	facing = Vector2i.DOWN
+
 func update_animation() -> void:
 	var state := "walk" if is_moving else "idle"
 	$AnimatedSprite2D.play(state + "_" + get_dir_name(facing))
-
-# func _unhandled_input(event: InputEvent) -> void:
-# 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-# 		if is_instance_valid(hovered):
-# 			print("clicked ", hovered.name) # approach logic goes here next
-# 			return
-
-# 		var target := world.world_to_cell(get_global_mouse_position())
-# 		if not world.is_solid(target):
-# 			follow_path(target)
+	# legs keep up with the faster pace
+	$AnimatedSprite2D.speed_scale = run_multiplier if is_moving and is_running else 1.0
 
 func _unhandled_input(event: InputEvent) -> void:
+	if input_locked:
+		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		if is_instance_valid(hovered):
 			start_interaction(hovered)
@@ -113,7 +121,8 @@ func _physics_process(delta: float) -> void:
 		else:
 			facing = Vector2i(0, int(signf(to_target.y)))
 
-	global_position = global_position.move_toward(target, speed * delta)
+	var current_speed := speed * (run_multiplier if is_running else 1.0)
+	global_position = global_position.move_toward(target, current_speed * delta)
 
 	if global_position == target:
 		current_tile = target_tile
@@ -139,7 +148,7 @@ func update_hover() -> void:
 
 	var hits := get_world_2d().direct_space_state.intersect_point(query, 1)
 	var found: Interactable = null
-	if not hits.is_empty():
+	if not hits.is_empty() and not input_locked:
 		# the Area2D is a child of the Interactable root
 		found = hits[0].collider.get_parent() as Interactable
 

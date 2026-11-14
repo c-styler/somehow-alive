@@ -7,6 +7,12 @@ signal solid_changed(cell: Vector2i, solid: bool)
 
 const DIRS: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
 
+## World border, in cells. Everything outside is solid: no walking, no pathing, Orbi
+## can't float there either. Keep it well inside the painted ground so the camera never
+## shows the edge of the map. Empty rect = no border.
+## Base spans roughly x -5..57, y -6..9; this leaves ~7 tiles of Mars around it.
+@export var playable_rect := Rect2i(-12, -13, 77, 30)
+
 var astar := AStarGrid2D.new()
 var occupied := {} # for dynamic blockers like npc
 
@@ -34,6 +40,21 @@ func _ready() -> void:
 			if astar.is_in_boundsv(cell):
 				set_solid(cell, true)
 
+	if playable_rect.has_area():
+		var r := astar.region
+		for y in range(r.position.y, r.end.y):
+			for x in range(r.position.x, r.end.x):
+				if not playable_rect.has_point(Vector2i(x, y)):
+					astar.set_point_solid(Vector2i(x, y))
+
+## How many cells inside the border this cell is (0 = on the edge, negative = outside).
+func distance_to_border(cell: Vector2i) -> int:
+	if not playable_rect.has_area():
+		return 1 << 20
+	return mini(
+		mini(cell.x - playable_rect.position.x, playable_rect.end.x - 1 - cell.x),
+		mini(cell.y - playable_rect.position.y, playable_rect.end.y - 1 - cell.y))
+
 func is_solid(cell: Vector2i) -> bool:
 	return not astar.is_in_boundsv(cell) or astar.is_point_solid(cell)
 
@@ -41,7 +62,56 @@ func is_free(cell: Vector2i) -> bool:
 	return not is_solid(cell) and not occupied.has(cell)
 
 func get_path_cells(from: Vector2i, to: Vector2i) -> Array[Vector2i]:
-	return astar.get_id_path(from, to)
+	return straighten(astar.get_id_path(from, to))
+
+## A* on a 4-way grid has many equally short routes and happily picks staircase ones
+## (right, down, right, down...). This rewrites the path with as few turns as possible
+## without making it longer: from each point, jump to the furthest later point that can
+## be reached by an L (one straight leg, one turn, one straight leg) through free cells.
+## An L between two cells is always the shortest possible walk, so length never grows.
+func straighten(path: Array[Vector2i]) -> Array[Vector2i]:
+	if path.size() < 3:
+		return path
+	var out: Array[Vector2i] = [path[0]]
+	var i := 0
+	var heading := Vector2i.ZERO # direction of the last step, to prefer not turning
+	while i < path.size() - 1:
+		for j in range(path.size() - 1, i, -1):
+			var leg := _l_route(path[i], path[j], heading)
+			if not leg.is_empty() and leg.size() <= j - i:
+				out.append_array(leg)
+				heading = leg[-1] - (out[-2])
+				i = j
+				break
+	return out
+
+## Cells from a (exclusive) to b (inclusive) along an L, or [] if both L's are blocked.
+## Tries the L whose first leg keeps the current heading first.
+func _l_route(a: Vector2i, b: Vector2i, heading: Vector2i) -> Array[Vector2i]:
+	var horizontal_first := heading.y == 0 # moving sideways (or not yet) -> keep going sideways
+	for attempt in 2:
+		var corner := Vector2i(b.x, a.y) if horizontal_first else Vector2i(a.x, b.y)
+		var cells := _line(a, corner)
+		cells.append_array(_line(corner, b))
+		var ok := true
+		for c in cells:
+			if is_solid(c):
+				ok = false
+				break
+		if ok:
+			return cells
+		horizontal_first = not horizontal_first
+	return []
+
+## Straight axis-aligned run from a (exclusive) to b (inclusive).
+func _line(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	var step := (b - a).sign()
+	var c := a
+	while c != b:
+		c += step
+		cells.append(c)
+	return cells
 
 func world_to_cell(global_pos: Vector2) -> Vector2i:
 	return tile_map.local_to_map(tile_map.to_local(global_pos))

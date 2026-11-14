@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://bjdw2ho851yn8"]
 
-[ext_resource type="Script" uid="uid://dmxndnoe8s7qs" path="res://Scripts/interactable.gd" id="1_n2vb7"]
+[ext_resource type="Script" path="res://Scripts/garden.gd" id="1_n2vb7"]
 [ext_resource type="Texture2D" uid="uid://bsd1vib3i3vcr" path="res://Assets/plants.png" id="1_ynvo8"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ynvo8"]
@@ -10,6 +10,7 @@ size = Vector2(136, 129)
 script = ExtResource("1_n2vb7")
 hitbox = NodePath("Area2D")
 footprint = NodePath("Area2D/CollisionShape2D")
+task_id = &"water_garden"
 metadata/_edit_group_ = true
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=1132787748]
