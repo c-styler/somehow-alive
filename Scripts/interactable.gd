@@ -19,6 +19,10 @@ signal action_requested(action: StringName, source: Interactable)
 
 const highlight_color := Color(1.3, 1.4, 1.6)
 
+## Set by World: false when this object's task isn't on today's list yet (locked, or not
+## today's day). Interactables can check it to say "not now" instead of starting the task.
+var task_available := true
+
 var indicator: InteractIndicator
 
 func _ready() -> void:

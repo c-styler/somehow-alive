@@ -22,9 +22,10 @@
 [ext_resource type="PackedScene" uid="uid://dfg340p6pfdsr" path="res://Scenes/orbi.tscn" id="20_orbi"]
 [ext_resource type="Script" uid="uid://c0q41a8vhrm82" path="res://Scripts/base_light.gd" id="21_blight"]
 [ext_resource type="Script" uid="uid://djir4n2keej25" path="res://Scripts/base_ambient_light.gd" id="22_bamb"]
-[ext_resource type="Script" path="res://Scripts/world_border.gd" id="23_border"]
-[ext_resource type="Script" path="res://Scripts/zoom_camera.gd" id="24_zoomcam"]
+[ext_resource type="Script" uid="uid://br65fv87sj3xe" path="res://Scripts/world_border.gd" id="23_border"]
+[ext_resource type="Script" uid="uid://dfsyhruyh7qd8" path="res://Scripts/zoom_camera.gd" id="24_zoomcam"]
 [ext_resource type="PackedScene" path="res://Scenes/bed.tscn" id="25_bed"]
+[ext_resource type="PackedScene" path="res://Scenes/solar_panel.tscn" id="26_solar"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_go701"]
 texture = ExtResource("1_a02cp")
@@ -343,11 +344,11 @@ texture = ExtResource("8_k7acu")
 [node name="World" type="Node2D" unique_id=2136391832 node_paths=PackedStringArray("hud", "mars_ambient", "canvas_modulate", "player", "grid", "orbi")]
 script = ExtResource("1_0fj1v")
 hud = NodePath("HUD")
+mars_ambient = NodePath("MarsAmbientAudio")
+canvas_modulate = NodePath("CanvasModulate")
 player = NodePath("Astronaut")
 grid = NodePath("WorldGrid")
 orbi = NodePath("Orbi")
-mars_ambient = NodePath("MarsAmbientAudio")
-canvas_modulate = NodePath("CanvasModulate")
 
 [node name="TileMapLayer" type="TileMapLayer" parent="." unique_id=614205833]
 position = Vector2(-16, 44)
@@ -361,13 +362,26 @@ tile_map = NodePath("../TileMapLayer")
 [node name="Garden" parent="." unique_id=1449742879 instance=ExtResource("13_c5t2i")]
 position = Vector2(752, -148)
 
-[node name="PlayerBed" parent="." instance=ExtResource("25_bed")]
+[node name="PlayerBed" parent="." unique_id=815319187 instance=ExtResource("25_bed")]
 position = Vector2(-240, -212)
-task_id = &"sleep"
 is_players_bed = true
+task_id = &"sleep"
 
-[node name="CrewBed2" parent="." instance=ExtResource("25_bed")]
+[node name="CrewBed2" parent="." unique_id=528162127 instance=ExtResource("25_bed")]
 position = Vector2(80, -212)
+
+[node name="SolarArray" type="Node2D" parent="."]
+
+[node name="SolarPanel1" parent="SolarArray" instance=ExtResource("26_solar")]
+position = Vector2(-208, 812)
+
+[node name="SolarPanel2" parent="SolarArray" instance=ExtResource("26_solar")]
+position = Vector2(-16, 812)
+task_id = &"fix_solar"
+is_repair_point = true
+
+[node name="SolarPanel3" parent="SolarArray" instance=ExtResource("26_solar")]
+position = Vector2(176, 812)
 
 [node name="GardenLight" type="PointLight2D" parent="." unique_id=821502827]
 position = Vector2(751.27, -152.17)
@@ -416,7 +430,7 @@ script = ExtResource("3_5a7ea")
 tile_map = NodePath("../TileMapLayer")
 world = NodePath("../WorldGrid")
 
-[node name="WorldBorder" type="Node2D" parent="." node_paths=PackedStringArray("grid", "player", "canvas_modulate")]
+[node name="WorldBorder" type="Node2D" parent="." unique_id=668724540 node_paths=PackedStringArray("grid", "player", "canvas_modulate")]
 script = ExtResource("23_border")
 grid = NodePath("../WorldGrid")
 player = NodePath("../Astronaut")

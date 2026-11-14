@@ -1,0 +1,25 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://Scripts/solar_panel.gd" id="1_solar"]
+[ext_resource type="Texture2D" uid="uid://bvqtuia2bneak" path="res://Assets/Panel/solarPanel.png" id="2_solar"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_solar"]
+size = Vector2(120, 110)
+
+[node name="SolarPanel" type="Node2D" node_paths=PackedStringArray("hitbox", "footprint")]
+script = ExtResource("1_solar")
+hitbox = NodePath("Area2D")
+footprint = NodePath("Area2D/CollisionShape2D")
+metadata/_edit_group_ = true
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture_filter = 1
+scale = Vector2(2.6, 2.6)
+texture = ExtResource("2_solar")
+
+[node name="Area2D" type="Area2D" parent="."]
+collision_layer = 4
+collision_mask = 0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" groups=["blockers"]]
+shape = SubResource("RectangleShape2D_solar")

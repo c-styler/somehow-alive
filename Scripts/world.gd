@@ -6,14 +6,27 @@ signal task_done(task_id: StringName)
 
 ## Every task in the game: id -> checklist text. Interactables reference these ids via task_id.
 const TASKS := {
+	&"fix_solar": "Fix the solar panels",
 	&"water_garden": "Water the garden",
 	&"sleep": "Go to sleep",
 }
 ## Tasks that only appear (in the HUD, with their "!" marker) once these are done.
+## Requirements that aren't on today's list are ignored.
 const TASK_REQUIRES := {
-	&"sleep": [&"water_garden"],
+	&"sleep": [&"water_garden", &"fix_solar"],
+}
+## Tasks that only exist on certain days (missing = every day).
+const TASK_DAYS := {
+	&"fix_solar": [2],
+}
+## Urgent tasks: shown in coral, and Orbi calls you over (TASK_INTROS) as soon as they appear.
+const TASK_URGENT := [&"fix_solar"]
+## Orbi dialogue played when a task first shows up on the list.
+const TASK_INTROS := {
+	&"fix_solar": &"fix_solar_intro",
 }
 var completed_tasks := {} # task_id -> true
+var _pending_intros: Array[StringName] = []
 var _shown_tasks := {} # task_id -> true, already added to the HUD
 var _interactables: Array[Interactable] = []
 var _sleeping := false
@@ -62,6 +75,7 @@ var _fade: ColorRect
 @export var lights_warm_end := 20.0 # fully warm by
 @export var lights_cool_start := 5.0 # morning transition begins
 @export var lights_cool_end := 7.0 # fully white by
+@export var low_power_brightness := 0.45 # base light strength while the power is low
 
 const HOURS_PER_DAY := 24.0
 
@@ -88,7 +102,18 @@ func _ready() -> void:
 	_setup_camera_limits()
 	_base_spawn_cell = grid.world_to_cell(player.global_position) # where the game starts = home
 	_setup_fade()
-	show_clock_moment.call_deferred()
+	_game_start.call_deferred()
+
+
+func _game_start() -> void:
+	await show_clock_moment()
+	await _play_pending_intros()
+
+
+## Plays queued "go do this task!" dialogues (one after another).
+func _play_pending_intros() -> void:
+	while not _pending_intros.is_empty():
+		await play_dialogue(_pending_intros.pop_front())
 
 
 func _setup_fade() -> void:
@@ -179,11 +204,22 @@ func _setup_tasks() -> void:
 	_refresh_tasks()
 
 
+func is_task_today(task_id: StringName) -> bool:
+	return not TASK_DAYS.has(task_id) or day in TASK_DAYS[task_id]
+
+
 func is_task_unlocked(task_id: StringName) -> bool:
+	if not is_task_today(task_id):
+		return false
 	for req in TASK_REQUIRES.get(task_id, []):
-		if not completed_tasks.has(req):
+		if is_task_today(req) and not completed_tasks.has(req):
 			return false
 	return true
+
+
+## Power is low on a day where the solar panels need fixing, until they're fixed.
+func is_power_low() -> bool:
+	return is_task_today(&"fix_solar") and not completed_tasks.has(&"fix_solar")
 
 
 ## Adds newly unlocked tasks to the HUD and shows/hides "!" markers to match.
@@ -191,11 +227,16 @@ func _refresh_tasks() -> void:
 	for id in TASKS:
 		if not _shown_tasks.has(id) and is_task_unlocked(id):
 			_shown_tasks[id] = true
-			hud.add_task(id, TASKS[id])
+			hud.add_task(id, TASKS[id], id in TASK_URGENT)
+			if TASK_INTROS.has(id):
+				_pending_intros.append(TASK_INTROS[id])
 	for node in _interactables:
-		if node.task_id == &"" or not node.show_indicator:
+		if node.task_id == &"":
 			continue
-		node.set_indicator_visible(is_task_unlocked(node.task_id) and not completed_tasks.has(node.task_id))
+		var open := is_task_unlocked(node.task_id) and not completed_tasks.has(node.task_id)
+		node.task_available = open
+		if node.show_indicator:
+			node.set_indicator_visible(open)
 
 
 func _on_action_requested(action: StringName, _source: Interactable) -> void:
@@ -232,7 +273,8 @@ func _try_sleep() -> void:
 	await t.finished
 	player.input_locked = false
 	_sleeping = false
-	_task_outro(&"sleep") # good morning + clock
+	await _task_outro(&"sleep") # good morning + clock
+	await _play_pending_intros() # e.g. Orbi's power alert on day 2
 
 
 func complete_task(task_id: StringName) -> void:
@@ -241,6 +283,7 @@ func complete_task(task_id: StringName) -> void:
 	# let the checkmark animate before the outro
 	await get_tree().create_timer(0.8).timeout
 	await _task_outro(task_id)
+	await _play_pending_intros()
 
 
 ## Records + checks off a task. Returns false if unknown or already done.
@@ -309,6 +352,8 @@ func is_task_done(task_id: StringName) -> bool:
 
 func _process(_delta: float) -> void:
 	_check_border()
+	if is_power_low():
+		_update_base_lights() # every frame, for the flicker
 
 
 ## Moves the clock forward to the next time it's `hour` (tomorrow if already past),
@@ -366,6 +411,13 @@ func _update_base_lights() -> void:
 	var night_lum := day_gradient.sample(0.0).get_luminance()
 	var k := clampf(inverse_lerp(night_lum, 1.0, canvas_modulate.color.get_luminance()), 0.0, 1.0)
 	var e := lerpf(base_night_energy, base_day_energy, k)
+	if is_power_low():
+		# brownout: dimmer, with a nervous flicker and the odd dropout
+		var t := Time.get_ticks_msec() / 1000.0
+		var flicker := 0.85 + 0.15 * sin(t * 23.0) * sin(t * 7.3)
+		if fmod(t, 4.3) < 0.12:
+			flicker = 0.25
+		e = maxf(e, base_night_energy * 0.5) * low_power_brightness * flicker
 	get_tree().call_group("base_lights", "set_lighting", c, e)
 
 

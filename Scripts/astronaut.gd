@@ -8,6 +8,19 @@ signal destination_set(cell: Vector2i)
 @export var speed := 120.0 # pixels per second
 @export var run_multiplier := 1.6 # speed boost while holding right mouse button
 
+enum Outfit { SPACESUIT, GINGER }
+## Which character art to use. SPACESUIT = the frames set up in astronaut.tscn,
+## GINGER = ginger_frames (Assets/Astronaut/ginger_frames.tres).
+@export var skin := Outfit.GINGER:
+	set(v):
+		skin = v
+		if is_node_ready():
+			_apply_skin()
+
+## Edit FPS/frames by opening this resource in the SpriteFrames editor.
+@export var ginger_frames: SpriteFrames = preload("res://Assets/Astronaut/ginger_frames.tres")
+var _spacesuit_frames: SpriteFrames
+
 ## Hold right mouse to hurry (ignored while a task/dialogue has the input).
 var is_running: bool:
 	get: return not input_locked and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT)
@@ -33,6 +46,7 @@ func _ready() -> void:
 	current_tile = world.world_to_cell(global_position)
 	global_position = world.cell_to_world(current_tile)
 	facing = Vector2.DOWN
+	_apply_skin()
 
 ## Instantly moves to a cell, dropping any walk or pending interaction.
 func teleport(cell: Vector2i) -> void:
@@ -41,6 +55,16 @@ func teleport(cell: Vector2i) -> void:
 	current_tile = cell
 	global_position = world.cell_to_world(cell)
 	facing = Vector2i.DOWN
+
+func _apply_skin() -> void:
+	var sprite: AnimatedSprite2D = $AnimatedSprite2D
+	if _spacesuit_frames == null:
+		_spacesuit_frames = sprite.sprite_frames # whatever the scene was set up with
+	if skin == Outfit.GINGER and ginger_frames:
+		sprite.sprite_frames = ginger_frames
+	else:
+		sprite.sprite_frames = _spacesuit_frames
+	update_animation()
 
 func update_animation() -> void:
 	var state := "walk" if is_moving else "idle"

@@ -193,7 +193,8 @@ func clear_tasks() -> void:
 		child.queue_free()
 	task_rows.clear()
 
-func add_task(task_id: StringName, text: String) -> void:
+## urgent: coral text with a pulsing "!" so it reads as "do this now".
+func add_task(task_id: StringName, text: String, urgent := false) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 
@@ -204,10 +205,24 @@ func add_task(task_id: StringName, text: String) -> void:
 	label.text = text
 	label.add_theme_font_override("font", TASK_FONT)
 	label.add_theme_font_size_override("font_size", 16)
-	label.add_theme_color_override("font_color", CREAM)
+	label.add_theme_color_override("font_color", Color("F07167") if urgent else CREAM)
 	row.add_child(label)
 
+	if urgent:
+		var bang := Label.new()
+		bang.text = "!"
+		bang.add_theme_font_override("font", TASK_FONT)
+		bang.add_theme_font_size_override("font_size", 16)
+		bang.add_theme_color_override("font_color", Color("F07167"))
+		row.add_child(bang)
+
 	task_list.add_child(row)
+	if urgent:
+		task_list.move_child(row, 0)
+		var bang: Label = row.get_child(row.get_child_count() - 1)
+		var t := bang.create_tween().set_loops() # needs to be in the tree first
+		t.tween_property(bang, "modulate:a", 0.2, 0.4)
+		t.tween_property(bang, "modulate:a", 1.0, 0.4)
 	task_rows[task_id] = {box = box, label = label}
 
 func set_task_done(task_id: StringName) -> void:

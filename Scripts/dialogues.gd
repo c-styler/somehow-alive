@@ -55,6 +55,43 @@ const ALL := {
 		},
 	],
 
+	# --- solar panels (day 2) ---
+	&"fix_solar_intro": [
+		{
+			mood = "anger",
+			text = "Uh-oh! Do you see the lights flickering? Our power is running low!",
+		},
+		{
+			mood = "sad",
+			text = "Mars dust settles on our solar panels, like a blanket blocking the Sun. Covered panels can't make electricity.",
+		},
+		{
+			mood = "neutral",
+			text = "This is urgent! Head out the west exit. The solar panels are just outside, south of the base.",
+		},
+	],
+	&"fix_solar": [
+		{
+			mood = "happy",
+			text = "The lights are back! Great job, engineer!",
+		},
+		{
+			mood = "neutral",
+			text = "Dust is a real problem on Mars. NASA's InSight lander had to stop working in 2022 because its solar panels got too dusty.",
+			caption = "Source: NASA",
+		},
+		{
+			mood = "happy",
+			text = "But we have you! Clean panels mean power for the lights, the air and the garden.",
+		},
+	],
+	&"solar_ok": [
+		{
+			mood = "happy",
+			text = "The solar panels look clean and shiny today. Nothing to fix!",
+		},
+	],
+
 	# --- world border ---
 	&"border_warning": [
 		{
