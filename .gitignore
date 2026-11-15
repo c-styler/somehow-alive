@@ -2,3 +2,7 @@
 .godot/
 /android/
 /.vscode
+
+# exported builds / archives (too big for GitHub; ship builds via the build repo or Releases)
+/Build.zip
+/Assets/ffmpeg-9.0.2-essentials_build

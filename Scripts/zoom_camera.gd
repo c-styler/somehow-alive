@@ -11,9 +11,9 @@ extends Camera2D
 @export var corridor_sources: Array[int] = [4] # base_floor.png
 @export var room_sources: Array[int] = [11] # base_floor2.png
 
-@export var corridor_zoom := 0.55 # smaller = more zoomed out
-@export var room_zoom := 0.85
-@export var default_zoom := 0.7 # outside / anything else
+@export var corridor_zoom := 0.65 # smaller = more zoomed out
+@export var room_zoom := 1.0
+@export var default_zoom := 0.8 # outside / anything else
 @export var zoom_speed := 3.0 # higher = snappier transitions
 
 var _target_zoom := 0.7

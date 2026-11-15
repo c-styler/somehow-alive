@@ -35,7 +35,15 @@ var current_tile: Vector2i
 var facing: Vector2i
 
 var is_moving: bool:
-	get: return not path.is_empty()
+	get: return not path.is_empty() and not hold_movement
+
+## Optional check World plugs in: func(from_cell, to_cell) -> bool. If it returns true
+## for the next step, he stops on from_cell, emits step_blocked and waits until
+## hold_movement is cleared (used for the indoor/outdoor suit change at the exits).
+var step_gate: Callable
+var hold_movement := false
+var _gate_checked := Vector2i(1 << 30, 1 << 30) # step already let through
+signal step_blocked(from_cell: Vector2i, to_cell: Vector2i)
 
 var path: Array[Vector2i] = []
 
@@ -52,6 +60,8 @@ func _ready() -> void:
 func teleport(cell: Vector2i) -> void:
 	path.clear()
 	clear_pending()
+	hold_movement = false
+	_gate_checked = Vector2i(1 << 30, 1 << 30)
 	current_tile = cell
 	global_position = world.cell_to_world(cell)
 	facing = Vector2i.DOWN
@@ -65,6 +75,18 @@ func _apply_skin() -> void:
 	else:
 		sprite.sprite_frames = _spacesuit_frames
 	update_animation()
+
+## Instantly completes the next step of the current walk (used to jump through an
+## exit while the screen is black), then keeps following the rest of the path.
+func skip_step() -> void:
+	if path.is_empty():
+		return
+	current_tile = path[0]
+	global_position = world.cell_to_world(current_tile)
+	_gate_checked = Vector2i(1 << 30, 1 << 30)
+	path.remove_at(0)
+	if path.is_empty():
+		_on_arrived()
 
 func update_animation() -> void:
 	var state := "walk" if is_moving else "idle"
@@ -135,8 +157,21 @@ func _physics_process(delta: float) -> void:
 		update_animation()
 		return
 
+	if hold_movement:
+		update_animation()
+		return
+
 	var target_tile := path[0]
 	var target := tile_map.to_global(tile_map.map_to_local(target_tile))
+
+	# about to leave the center of current_tile for a new step: ask the gate first
+	if target_tile != _gate_checked and global_position == world.cell_to_world(current_tile):
+		_gate_checked = target_tile
+		if step_gate.is_valid() and step_gate.call(current_tile, target_tile):
+			hold_movement = true
+			step_blocked.emit(current_tile, target_tile)
+			update_animation()
+			return
 
 	var to_target := target - global_position
 	if to_target != Vector2.ZERO:
@@ -150,6 +185,7 @@ func _physics_process(delta: float) -> void:
 
 	if global_position == target:
 		current_tile = target_tile
+		_gate_checked = Vector2i(1 << 30, 1 << 30) # next step gets checked again
 		path.remove_at(0)
 		if path.is_empty():
 			_on_arrived()

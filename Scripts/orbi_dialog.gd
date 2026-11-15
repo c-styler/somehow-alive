@@ -14,6 +14,20 @@ const MOODS := {
 }
 const BODY_FONT := "res://Assets/Fonts/Fredoka,Nunito,Press_Start_2P/Fredoka/static/Fredoka-Medium.ttf"
 const BUTTON_FONT := "res://Assets/Fonts/Fredoka,Nunito,Press_Start_2P/Nunito/static/Nunito-Black.ttf"
+## Orbi speaks Arabic, and Fredoka/Nunito have no Arabic letters, so the dialogue uses
+## Baloo Bhaijaan 2 (rounded and friendly, like Fredoka; it covers Latin too). Bundling it
+## matters for web exports, which have no system fonts to fall back on.
+const ARABIC_DIR := "res://Assets/Baloo_Bhaijaan_2,Orbitron/Baloo_Bhaijaan_2/static/"
+const ARABIC_BODY_FONT := ARABIC_DIR + "BalooBhaijaan2-Medium.ttf"
+const ARABIC_BUTTON_FONT := ARABIC_DIR + "BalooBhaijaan2-ExtraBold.ttf"
+
+## Baloo Bhaijaan 2 for the given role ("body" / "button"), or the old Latin font if it's missing.
+static func _dialogue_font(fallback_path: String) -> Font:
+	var path := ARABIC_BUTTON_FONT if fallback_path == BUTTON_FONT else ARABIC_BODY_FONT
+	if ResourceLoader.exists(path):
+		return load(path)
+	push_warning("Arabic font missing at %s, falling back (Arabic may not render on web)" % path)
+	return load(fallback_path)
 
 # palette
 const TEAL := Color("00AFB9")
@@ -101,7 +115,7 @@ func _show_line(line: Dictionary) -> void:
 	media_row.visible = image_frame.visible or caption_label.visible
 	media_row.modulate.a = 0.0 # revealed once typing ends
 
-	next_button.text = "NEXT ›" if index < lines.size() - 1 else "OK!"
+	next_button.text = "التالي ‹" if index < lines.size() - 1 else "حسنًا!"
 
 func _finish_typing() -> void:
 	typing = false
@@ -169,7 +183,12 @@ func _build() -> void:
 	text_label = Label.new()
 	text_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text_label.custom_minimum_size = Vector2(200, 0)
-	text_label.add_theme_font_override("font", load(BODY_FONT))
+	# Arabic: right-to-left, right-aligned, and the typewriter reveals already-joined
+	# letter shapes (so letters don't change form as the next one appears)
+	text_label.text_direction = Control.TEXT_DIRECTION_RTL
+	text_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	text_label.visible_characters_behavior = TextServer.VC_CHARS_AFTER_SHAPING
+	text_label.add_theme_font_override("font", _dialogue_font(BODY_FONT))
 	text_label.add_theme_font_size_override("font_size", 26)
 	text_label.add_theme_color_override("font_color", DEEP)
 	bubble.add_child(text_label)
@@ -194,14 +213,15 @@ func _build() -> void:
 
 	caption_label = Label.new()
 	caption_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	caption_label.add_theme_font_override("font", load(BODY_FONT))
+	caption_label.text_direction = Control.TEXT_DIRECTION_RTL
+	caption_label.add_theme_font_override("font", _dialogue_font(BODY_FONT))
 	caption_label.add_theme_font_size_override("font_size", 18)
 	caption_label.add_theme_color_override("font_color", CREAM)
 	media_row.add_child(caption_label)
 
 	# NEXT, bottom-right
 	next_button = Button.new()
-	next_button.add_theme_font_override("font", load(BUTTON_FONT))
+	next_button.add_theme_font_override("font", _dialogue_font(BUTTON_FONT))
 	next_button.add_theme_font_size_override("font_size", 26)
 	next_button.add_theme_color_override("font_color", CREAM)
 	next_button.add_theme_color_override("font_hover_color", Color.WHITE)

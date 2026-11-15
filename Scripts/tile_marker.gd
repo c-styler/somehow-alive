@@ -20,7 +20,7 @@ func _process(_delta: float) -> void:
 	self_modulate = Color(1.0 / maxf(c.r, 0.05), 1.0 / maxf(c.g, 0.05), 1.0 / maxf(c.b, 0.05))
 
 func _draw() -> void:
-	var half := Vector2(world.astar.cell_size) / 2.0
+	var half := Vector2(world.cell_size) / 2.0
 	print(half)
 	draw_rect(Rect2(-half, half * 2.0), color, false, 2.0)
 

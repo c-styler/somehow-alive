@@ -4,6 +4,9 @@ class_name Dialogues
 ##   text    - what Orbi says
 ##   image   - optional res:// path of a picture shown under the bubble
 ##   caption - optional text beside the picture (e.g. a source)
+## Lines are in Modern Standard Arabic (shown right-to-left by OrbiDialog).
+## Text can use {time} (e.g. "6:00 صباحًا") and {day} (e.g. "2"); World fills them in from
+## the real clock when the line plays, so dialogue never disagrees with the HUD.
 ##
 ## Task conversations use the task id as their key, so World can play them
 ## automatically when that task completes.
@@ -12,17 +15,17 @@ const ALL := {
 	&"water_garden": [
 		{
 			mood = "happy",
-			text = "Great watering! Plants need just the right amount of water. Too much, and their roots can't breathe!",
+			text = "أحسنت السقي! تحتاج النباتات إلى كمية مناسبة تمامًا من الماء، فإذا زادت لا تستطيع جذورها التنفس!",
 		},
 		{
 			mood = "neutral",
-			text = "Astronauts already grow food in space! NASA's Veggie garden on the Space Station has grown lettuce that the crew got to eat.",
+			text = "رواد الفضاء يزرعون الطعام في الفضاء فعلًا! فقد نما الخسّ في حديقة «فيجي» التابعة لناسا على متن محطة الفضاء الدولية، وتناوله الطاقم.",
 			image = "res://Assets/plants.png", # placeholder until we have a real photo
-			caption = "Source: NASA",
+			caption = "المصدر: ناسا",
 		},
 		{
 			mood = "happy",
-			text = "Keep our garden happy and one day it could feed the whole base!",
+			text = "اعتنِ بحديقتنا جيدًا، وقد تُطعم القاعدة كلها يومًا ما!",
 		},
 	],
 
@@ -30,28 +33,38 @@ const ALL := {
 	&"sleep": [
 		{
 			mood = "happy",
-			text = "Good morning! It's 8 AM, time for a new day on Mars.",
+			text = "صباح الخير! الساعة الآن {time}، حان وقت يوم جديد على المريخ.",
 		},
 		{
 			mood = "neutral",
-			text = "Did you know? A day on Mars is called a sol, and it's about 40 minutes longer than a day on Earth!",
-			caption = "Source: NASA",
+			text = "هل تعلم؟ يُسمّى اليوم على المريخ «سول»، وهو أطول من يوم الأرض بنحو 40 دقيقة!",
+			caption = "المصدر: ناسا",
 		},
 		{
 			mood = "happy",
-			text = "A rested crew member is a careful crew member. Let's see what the base needs today!",
+			text = "فرد الطاقم المرتاح فردٌ حريص. لنرَ ما تحتاج إليه القاعدة اليوم!",
 		},
 	],
 	&"sleep_locked": [
 		{
 			mood = "neutral",
-			text = "Bedtime already? The plants are still thirsty! Let's water the garden first.",
+			text = "حان وقت النوم بالفعل؟ ما زالت النباتات عطشى! لنسقِ الحديقة أولًا.",
+		},
+	],
+	&"sleep_locked_fix_solar": [
+		{
+			mood = "anger",
+			text = "لا يمكننا النوم والطاقة منخفضة هكذا! تحتاج المدافئ وأجهزة الهواء إلى الكهرباء طوال الليل.",
+		},
+		{
+			mood = "neutral",
+			text = "أصلح الألواح الشمسية أولًا. إنها خارج المخرج الغربي مباشرةً، جنوب القاعدة.",
 		},
 	],
 	&"sleep_not_tired": [
 		{
 			mood = "happy",
-			text = "You just woke up, sleepyhead! There's work to do.",
+			text = "لقد استيقظت للتو أيها الكسول! هناك عمل ينتظرنا.",
 		},
 	],
 
@@ -59,36 +72,79 @@ const ALL := {
 	&"fix_solar_intro": [
 		{
 			mood = "anger",
-			text = "Uh-oh! Do you see the lights flickering? Our power is running low!",
+			text = "أوه لا! هل ترى الأضواء ترمش؟ طاقتنا توشك على النفاد!",
 		},
 		{
 			mood = "sad",
-			text = "Mars dust settles on our solar panels, like a blanket blocking the Sun. Covered panels can't make electricity.",
+			text = "غبار المريخ يتراكم على ألواحنا الشمسية مثل بطانية تحجب الشمس، والألواح المغطّاة لا تستطيع إنتاج الكهرباء.",
 		},
 		{
 			mood = "neutral",
-			text = "This is urgent! Head out the west exit. The solar panels are just outside, south of the base.",
+			text = "هذا أمر عاجل! اخرج من المخرج الغربي، فالألواح الشمسية خارج القاعدة مباشرةً من جهة الجنوب.",
 		},
 	],
 	&"fix_solar": [
 		{
 			mood = "happy",
-			text = "The lights are back! Great job, engineer!",
+			text = "عادت الأضواء! عمل رائع أيها المهندس!",
 		},
 		{
 			mood = "neutral",
-			text = "Dust is a real problem on Mars. NASA's InSight lander had to stop working in 2022 because its solar panels got too dusty.",
-			caption = "Source: NASA",
+			text = "الغبار مشكلة حقيقية على المريخ؛ فقد توقف مسبار «إنسايت» التابع لناسا عن العمل عام 2022 لأن الغبار غطّى ألواحه الشمسية.",
+			caption = "المصدر: ناسا",
 		},
 		{
 			mood = "happy",
-			text = "But we have you! Clean panels mean power for the lights, the air and the garden.",
+			text = "لكننا محظوظون بوجودك! الألواح النظيفة تعني طاقة للأضواء والهواء والحديقة.",
 		},
 	],
 	&"solar_ok": [
 		{
 			mood = "happy",
-			text = "The solar panels look clean and shiny today. Nothing to fix!",
+			text = "تبدو الألواح الشمسية نظيفة ولامعة اليوم. لا شيء يحتاج إلى إصلاح!",
+		},
+	],
+
+	# --- sunset selfie (day 1, 18:00) ---
+	&"window_selfie_intro": [
+		{
+			mood = "happy",
+			text = "انظر إلى الساعة، إنها {time}! الشمس تغرب، وغروب الشمس على المريخ مميّز جدًا.",
+		},
+		{
+			mood = "neutral",
+			text = "هناك نافذة دائرية في القاعة الكبيرة شرق القاعدة. هيا نلتقط صورة لكل من ينتظرنا على الأرض!",
+		},
+	],
+	&"window_selfie": [
+		{
+			mood = "happy",
+			text = "صورة رائعة! أبدو وسيمًا فيها، أليس كذلك؟",
+		},
+		{
+			mood = "neutral",
+			text = "هل لاحظت؟ السماء حول الشمس زرقاء! غروب الشمس على الأرض برتقالي، أما على المريخ فالغبار الناعم يسمح للضوء الأزرق بالمرور قرب الشمس.",
+			caption = "المصدر: ناسا",
+		},
+		{
+			mood = "happy",
+			text = "يا له من يوم! لنأخذ قسطًا من الراحة، فغدًا يوم جديد على المريخ!",
+		},
+	],
+	&"window_view": [
+		{
+			mood = "happy",
+			text = "يا له من منظر! يبدو المريخ جميلًا من هنا.",
+		},
+	],
+	&"sleep_locked_window_selfie": [
+		{
+			mood = "sad",
+			text = "انتظر، ليس قبل النوم! لم نلتقط صورة الغروب بعد.",
+		},
+		{
+			mood = "neutral",
+			text = "النافذة الدائرية في القاعة الكبيرة شرق القاعدة. هيا بنا!",
 		},
 	],
 
@@ -96,31 +152,31 @@ const ALL := {
 	&"border_warning": [
 		{
 			mood = "anger",
-			text = "Hey, hey! Where do you think you're going? Come back!",
+			text = "مهلًا، مهلًا! إلى أين أنت ذاهب؟ عُد إلى هنا!",
 		},
 		{
 			mood = "sad",
-			text = "You're the only crew member at the base right now. If you get lost out there, nobody will be left to take care of it.",
+			text = "أنت فرد الطاقم الوحيد في القاعدة الآن. إذا ضعت في الخارج، فلن يبقى أحد ليعتني بها.",
 		},
 		{
 			mood = "neutral",
-			text = "Mars can have dust storms so big they cover the whole planet! That's why we never wander far from the base.",
-			caption = "Source: NASA",
+			text = "قد تهبّ على المريخ عواصف غبارية ضخمة تغطي الكوكب بأكمله! لهذا لا نبتعد كثيرًا عن القاعدة.",
+			caption = "المصدر: ناسا",
 		},
 		{
 			mood = "happy",
-			text = "The base needs you! Let's head back and keep it running.",
+			text = "القاعدة تحتاج إليك! لنعد ونحافظ على عملها. وإذا ابتعدت مرة أخرى، فسأعيدك إلى القاعدة بنفسي!",
 		},
 	],
 
 	&"border_return": [
 		{
 			mood = "sad",
-			text = "Phew... you went too far out there, so I guided you back to the base.",
+			text = "يا للراحة... لقد ابتعدت كثيرًا، فأعدتك إلى القاعدة.",
 		},
 		{
 			mood = "neutral",
-			text = "That trip cost us a few minutes. Let's stay close and take care of the base!",
+			text = "كلّفتنا تلك الرحلة بضع دقائق. لنبقَ قريبين ونعتنِ بالقاعدة!",
 		},
 	],
 
@@ -128,30 +184,30 @@ const ALL := {
 	&"water_garden_overflow": [
 		{
 			mood = "anger",
-			text = "Whoa, whoa! That's way too much water! Now the soil is all soggy.",
+			text = "مهلًا، مهلًا! هذا ماء كثير جدًا! أصبحت التربة مبتلّة تمامًا.",
 		},
 		{
 			mood = "sad",
-			text = "Roots need air too. When soil is flooded, the water pushes the air out and the roots can't breathe.",
+			text = "الجذور تحتاج إلى الهواء أيضًا. عندما تغمر المياه التربة تطرد الهواء منها، فلا تستطيع الجذور التنفس.",
 		},
 		{
 			mood = "neutral",
-			text = "Water is super precious on Mars, so let's not waste it. Try again, and keep the pour in the green!",
+			text = "الماء ثمين جدًا على المريخ، فلا نُهدره. حاول مرة أخرى، وأبقِ السكب في المنطقة الخضراء!",
 		},
 	],
 	&"water_garden_too_slow": [
 		{
 			mood = "sad",
-			text = "Oh no... the plants are still thirsty. Just a few drops won't be enough for them.",
+			text = "أوه لا... ما زالت النباتات عطشى. بضع قطرات لن تكفيها.",
 		},
 		{
 			mood = "neutral",
-			text = "Did you know? Astronauts on the Space Station recycle about 98% of their water. Even sweat gets cleaned and reused!",
-			caption = "Source: NASA",
+			text = "هل تعلم؟ يعيد رواد الفضاء على محطة الفضاء الدولية تدوير نحو 98% من مياههم، حتى العرق يُنقّى ويُعاد استخدامه!",
+			caption = "المصدر: ناسا",
 		},
 		{
 			mood = "happy",
-			text = "So we have water to give! Pour a little faster next time. You've got this!",
+			text = "إذن لدينا ماء نعطيه! اسكب أسرع قليلًا في المرة القادمة. أنت قادر على ذلك!",
 		},
 	],
 }

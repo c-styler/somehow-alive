@@ -26,6 +26,8 @@ var task_available := true
 var indicator: InteractIndicator
 
 func _ready() -> void:
+	if Engine.is_editor_hint():
+		return # @tool subclasses (e.g. the window) draw in the editor; no gameplay setup there
 	indicator = InteractIndicator.new()
 	add_child(indicator)
 	indicator.position = _indicator_anchor() + indicator_offset

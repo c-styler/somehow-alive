@@ -22,6 +22,18 @@ func _ready() -> void:
 	_build_task_panel()
 	_build_clock()
 	_build_controls()
+	pointer = ObjectivePointer.new()
+	add_child(pointer)
+
+# --- objective arrow ---
+
+var pointer: ObjectivePointer
+
+## World calls this every frame: where the current task's object is (or null), and
+## whether it's urgent (coral) or a normal task (teal).
+func set_objective(world_pos: Variant, urgent := false) -> void:
+	pointer.target = world_pos
+	pointer.urgent = urgent
 
 # --- controls hint (center left) ---
 
@@ -29,7 +41,7 @@ func _ready() -> void:
 const CONTROLS := [
 	["LMB", "Move / Interact"],
 	["RMB", "Hold to walk faster"],
-	["K", "Helmet light"],
+	["K", "Helmet light (in suit)"],
 ]
 
 func _build_controls() -> void:
@@ -272,3 +284,45 @@ class TaskBox extends Control:
 		draw_line(a, a.lerp(b, first), CREAM, 2.5, true)
 		if second > 0.0:
 			draw_line(b, b.lerp(c, second), CREAM, 2.5, true)
+
+
+## Arrow at the screen edge pointing at an off-screen objective. Hidden when the
+## objective is on screen (its "!" marker takes over) or when there's none.
+class ObjectivePointer extends Control:
+	const MARGIN := 56.0
+	var target: Variant = null # Vector2 in world space, or null
+	var urgent := false
+
+	func _init() -> void:
+		set_anchors_preset(Control.PRESET_FULL_RECT)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _process(_delta: float) -> void:
+		queue_redraw()
+
+	func _draw() -> void:
+		if target == null:
+			return
+		var screen := get_viewport_rect().size
+		var p: Vector2 = get_viewport().get_canvas_transform() * (target as Vector2)
+		var inner := Rect2(Vector2.ZERO, screen).grow(-MARGIN)
+		if inner.has_point(p):
+			return # on screen: the object's own "!" is enough
+		var center := screen / 2
+		var dir := (p - center).normalized()
+		# walk from the center toward the target until we hit the inner rect's edge
+		var tx := INF if dir.x == 0 else ((inner.end.x if dir.x > 0 else inner.position.x) - center.x) / dir.x
+		var ty := INF if dir.y == 0 else ((inner.end.y if dir.y > 0 else inner.position.y) - center.y) / dir.y
+		var at := center + dir * minf(tx, ty)
+		var col := Color("F07167") if urgent else Color("00AFB9")
+		var pulse := 1.0 + 0.12 * sin(Time.get_ticks_msec() / 180.0)
+		draw_set_transform(at, dir.angle(), Vector2.ONE * pulse)
+		# bubble with an arrow head pointing toward the objective
+		draw_colored_polygon(PackedVector2Array([Vector2(34, 0), Vector2(14, -14), Vector2(14, 14)]), Color("0B3C5D"))
+		draw_colored_polygon(PackedVector2Array([Vector2(29, 0), Vector2(14, -10), Vector2(14, 10)]), col)
+		draw_circle(Vector2.ZERO, 19, Color("0B3C5D"))
+		draw_circle(Vector2.ZERO, 16, col)
+		# upright "!" in the middle
+		draw_set_transform(at, 0.0, Vector2.ONE * pulse)
+		draw_line(Vector2(0, -8), Vector2(0, 3), Color("FDFCDC"), 4.0, true)
+		draw_circle(Vector2(0, 8), 2.5, Color("FDFCDC"))

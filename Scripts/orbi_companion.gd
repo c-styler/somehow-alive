@@ -191,12 +191,32 @@ func _clear_line(a: Vector2, b: Vector2) -> bool:
 		return true
 	var normal := d.orthogonal().normalized() * body_radius
 	var steps := int(ceil(length / 8.0))
-	for s in steps + 1:
-		var p := a + d * (float(s) / steps)
-		for o in [Vector2.ZERO, normal, -normal]:
-			if world.is_solid(world.world_to_cell(p + o)):
+	for o in [Vector2.ZERO, normal, -normal]:
+		var prev: Vector2 = a + o
+		if world.is_solid(world.world_to_cell(prev)):
+			return false
+		for s in range(1, steps + 1):
+			var p: Vector2 = a + d * (float(s) / steps) + o
+			if not _can_move(prev, p):
 				return false
+			prev = p
 	return true
+
+## Can he float from p to q (a short hop)? Checks blocked cells AND thin walls on the
+## edges crossed. A diagonal hop is fine if either corner route is open.
+func _can_move(p: Vector2, q: Vector2) -> bool:
+	var a := world.world_to_cell(p)
+	var b := world.world_to_cell(q)
+	if a == b:
+		return not world.is_solid(b)
+	var d := b - a
+	if absi(d.x) + absi(d.y) == 1:
+		return world.can_step(a, b)
+	if absi(d.x) == 1 and absi(d.y) == 1:
+		var m1 := a + Vector2i(d.x, 0)
+		var m2 := a + Vector2i(0, d.y)
+		return (world.can_step(a, m1) and world.can_step(m1, b)) or (world.can_step(a, m2) and world.can_step(m2, b))
+	return false # moved more than a cell in one hop: treat as blocked
 
 func _nearest_free_cell(cell: Vector2i) -> Vector2i:
 	if not world.is_solid(cell):
@@ -227,15 +247,15 @@ func _steer(delta: float) -> void:
 			desired = to.normalized() * max_speed * arrive
 	velocity = velocity.move_toward(desired, acceleration * delta)
 
-	# never enter a solid tile; slide along walls if a step would
+	# never enter a solid tile or cross a wall; slide along it if a step would
 	var next := global_position + velocity * delta
-	if world.is_solid(world.world_to_cell(next)):
+	if not _can_move(global_position, next):
 		var slide_x := global_position + Vector2(velocity.x * delta, 0)
 		var slide_y := global_position + Vector2(0, velocity.y * delta)
-		if not world.is_solid(world.world_to_cell(slide_x)):
+		if _can_move(global_position, slide_x):
 			next = slide_x
 			velocity.y = 0
-		elif not world.is_solid(world.world_to_cell(slide_y)):
+		elif _can_move(global_position, slide_y):
 			next = slide_y
 			velocity.x = 0
 		else:

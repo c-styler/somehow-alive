@@ -8,22 +8,27 @@ signal task_done(task_id: StringName)
 const TASKS := {
 	&"fix_solar": "Fix the solar panels",
 	&"water_garden": "Water the garden",
+	&"window_selfie": "Take a sunset selfie",
 	&"sleep": "Go to sleep",
 }
 ## Tasks that only appear (in the HUD, with their "!" marker) once these are done.
 ## Requirements that aren't on today's list are ignored.
 const TASK_REQUIRES := {
-	&"sleep": [&"water_garden", &"fix_solar"],
+	&"fix_solar": [&"water_garden"], # power drops in the afternoon, after the watering
+	&"window_selfie": [&"fix_solar"], # once the power's back, it's sunset
+	&"sleep": [&"water_garden", &"fix_solar", &"window_selfie"],
 }
 ## Tasks that only exist on certain days (missing = every day).
 const TASK_DAYS := {
-	&"fix_solar": [2],
+	&"fix_solar": [1],
+	&"window_selfie": [1],
 }
 ## Urgent tasks: shown in coral, and Orbi calls you over (TASK_INTROS) as soon as they appear.
 const TASK_URGENT := [&"fix_solar"]
 ## Orbi dialogue played when a task first shows up on the list.
 const TASK_INTROS := {
 	&"fix_solar": &"fix_solar_intro",
+	&"window_selfie": &"window_selfie_intro",
 }
 var completed_tasks := {} # task_id -> true
 var _pending_intros: Array[StringName] = []
@@ -46,18 +51,29 @@ var orbi_dialog: OrbiDialog
 @export var grid: WorldGrid
 
 @export_group("World Border")
-## Orbi warns the player once they get this many cells from the border...
-@export var border_warning_cells := 3
-## ...and won't warn again until they've come back this many cells further in.
-@export var border_rearm_cells := 6
-## Touching the border fades the screen and puts you back at base, this much later.
+## After a border touch, you have to step this many cells back in before the next
+## touch counts (1st touch = Orbi's warning, 2nd = he takes you home).
+@export var border_rearm_cells := 2
+## Being taken home fades the screen and puts you back at base, this much later.
 @export var border_time_skip_minutes := 3.0
 @export var border_fade_time := 0.6
 @export var orbi: OrbiCompanion
 var _border_armed := true
+var _border_warned := false # Orbi already warned once; the next touch sends you home
 var _returning := false
 var _base_spawn_cell: Vector2i
 var _fade: ColorRect
+
+@export_group("Outfits")
+## Floor tile sources that count as "inside the base" (corridor + rooms). Walking from
+## these onto anything else (the Mars ground) puts the spacesuit on, and back off again.
+@export var indoor_sources: Array[int] = [4, 11]
+@export var outfit_fade_time := 0.3 # each way: dim, swap, undim
+@export var outfit_hold_time := 0.15 # how long it stays dim while he changes
+@export_range(0.0, 1.0) var outfit_dim := 1.0 # 1 = full black
+@export_group("")
+var _player_inside := true
+var _changing_outfit := false
 
 @export_group("Day Night Cycle")
 ## The clock never runs on its own: it only moves when the story moves it
@@ -81,7 +97,9 @@ const HOURS_PER_DAY := 24.0
 
 ## Completing these tasks moves the clock to this hour (forward, wrapping to tomorrow).
 const TASK_SETS_TIME := {
-	&"water_garden": 22.0,
+	&"water_garden": 14.0, # 06:00 morning watering -> 14:00
+	&"fix_solar": 18.0, # 14:00 power restored -> 18:00 sunset
+	&"window_selfie": 22.0, # 18:00 sunset selfie -> 22:00 bedtime
 }
 
 var game_hour := 0.0 # 0..24
@@ -102,10 +120,23 @@ func _ready() -> void:
 	_setup_camera_limits()
 	_base_spawn_cell = grid.world_to_cell(player.global_position) # where the game starts = home
 	_setup_fade()
+	_set_inside(_is_indoors(), false)
+	player.step_gate = _outfit_gate
+	player.step_blocked.connect(_on_step_blocked)
 	_game_start.call_deferred()
 
 
 func _game_start() -> void:
+	var intro := IntroCutscene.new()
+	add_child(intro)
+	# don't draw the world (lights, shadows, props) behind the full-screen video:
+	# frees CPU/GPU for video decoding, which matters a lot in web builds
+	visible = false
+	# bring the world back as soon as the video ends, so it's already underneath while
+	# the video fades out (otherwise the empty background shows through the fade)
+	intro.ending.connect(func(): visible = true)
+	await intro.play() # pauses the game while the video runs; returns at once if there's no video
+	visible = true
 	await show_clock_moment()
 	await _play_pending_intros()
 
@@ -137,6 +168,7 @@ func _return_to_base() -> void:
 	await t.finished
 
 	player.teleport(_base_spawn_cell)
+	_set_inside(true, false) # back home: casual clothes, no extra fade (already black)
 	if orbi:
 		orbi.snap_to_player()
 	skip_time(border_time_skip_minutes / 60.0)
@@ -173,22 +205,26 @@ func _setup_camera_limits() -> void:
 	cam.limit_bottom = int(br.y)
 
 
+## Touching the border once: Orbi warns you and stops you. Touching it again after
+## that (once you've stepped back in a little): he brings you home.
 func _check_border() -> void:
 	if _returning:
 		return
 	var d := grid.distance_to_border(grid.world_to_cell(player.global_position))
-	if d <= 0:
-		_return_to_base()
-		return
-	if _border_armed and d <= border_warning_cells:
+	if d <= 0 and _border_armed:
 		_border_armed = false
-		# stop heading further out (keep only the step already in progress)
+		if _border_warned:
+			_border_warned = false
+			_return_to_base()
+			return
+		_border_warned = true
+		# stop where you are (keep only the step already in progress)
 		if player.path.size() > 1:
 			player.path.resize(1)
 		player.clear_pending()
 		play_dialogue(&"border_warning")
 	elif not _border_armed and d >= border_rearm_cells:
-		_border_armed = true
+		_border_armed = true # stepped back in: the next touch counts again
 
 
 func _setup_tasks() -> void:
@@ -218,8 +254,9 @@ func is_task_unlocked(task_id: StringName) -> bool:
 
 
 ## Power is low on a day where the solar panels need fixing, until they're fixed.
+## Power is low once the solar task is on the list, until it's fixed.
 func is_power_low() -> bool:
-	return is_task_today(&"fix_solar") and not completed_tasks.has(&"fix_solar")
+	return is_task_unlocked(&"fix_solar") and not completed_tasks.has(&"fix_solar")
 
 
 ## Adds newly unlocked tasks to the HUD and shows/hides "!" markers to match.
@@ -249,7 +286,13 @@ func _try_sleep() -> void:
 	if _sleeping or _returning:
 		return
 	if not is_task_unlocked(&"sleep"):
-		play_dialogue(&"sleep_locked")
+		# point at whatever is still missing today
+		var missing := &"water_garden"
+		for req in TASK_REQUIRES[&"sleep"]:
+			if is_task_today(req) and not completed_tasks.has(req):
+				missing = req
+				break
+		play_dialogue(&"sleep_locked" if missing == &"water_garden" else StringName("sleep_locked_" + missing))
 		return
 	_sleeping = true
 	player.input_locked = true
@@ -342,8 +385,25 @@ func play_dialogue(id: StringName) -> void:
 	var lines := Dialogues.get_lines(id)
 	if lines.is_empty():
 		return
-	orbi_dialog.play(lines)
+	# fill {time} / {day} from the real clock (copies, so Dialogues.ALL stays untouched)
+	var vars := {"time": get_spoken_time(), "day": str(day)}
+	var filled: Array = []
+	for line: Dictionary in lines:
+		var l := line.duplicate()
+		l["text"] = String(l.get("text", "")).format(vars)
+		filled.append(l)
+	orbi_dialog.play(filled)
 	await orbi_dialog.finished
+
+
+## Clock time the way Orbi says it (Arabic): "6:00 صباحًا", "10:30 مساءً".
+func get_spoken_time() -> String:
+	var h := int(game_hour)
+	var m := int((game_hour - h) * 60.0)
+	var h12 := h % 12
+	if h12 == 0:
+		h12 = 12
+	return "%d:%02d %s" % [h12, m, "صباحًا" if h < 12 else "مساءً"]
 
 
 func is_task_done(task_id: StringName) -> bool:
@@ -352,6 +412,81 @@ func is_task_done(task_id: StringName) -> bool:
 
 func _process(_delta: float) -> void:
 	_check_border()
+	_update_objective()
+
+
+## Points the HUD arrow at the object for the task you should do next
+## (urgent tasks first, then in list order). Hidden during dialogues/minigames.
+func _update_objective() -> void:
+	if player.input_locked or get_tree().paused:
+		hud.set_objective(null)
+		return
+	var order: Array = TASK_URGENT.duplicate()
+	for id in TASKS:
+		if id not in order:
+			order.append(id)
+	for id in order:
+		if not _shown_tasks.has(id) or completed_tasks.has(id) or not is_task_unlocked(id):
+			continue
+		for node in _interactables:
+			if node.task_id == id:
+				hud.set_objective(node.global_position, id in TASK_URGENT)
+				return
+	hud.set_objective(null)
+
+
+func _cell_indoors(cell: Vector2i) -> bool:
+	return grid.tile_map.get_cell_source_id(cell) in indoor_sources
+
+
+func _is_indoors() -> bool:
+	return _cell_indoors(grid.world_to_cell(player.global_position))
+
+
+## The player asks before every step; stepping between indoors and outdoors stops him
+## on the last tile before the exit so he can change (see _on_step_blocked).
+func _outfit_gate(from_cell: Vector2i, to_cell: Vector2i) -> bool:
+	return not _returning and not _sleeping and _cell_indoors(from_cell) != _cell_indoors(to_cell)
+
+
+## Fade to black on this side, change, come back already standing on the other side.
+func _on_step_blocked(_from_cell: Vector2i, to_cell: Vector2i) -> void:
+	player.input_locked = true
+	_changing_outfit = true
+	_player_inside = _cell_indoors(to_cell)
+	var t := create_tween()
+	t.tween_property(_fade, "color:a", outfit_dim, outfit_fade_time)
+	await t.finished
+	player.skin = Player.Outfit.GINGER if _player_inside else Player.Outfit.SPACESUIT
+	player.skip_step() # now on the first tile past the threshold
+	if orbi:
+		orbi.snap_to_player()
+	await get_tree().create_timer(outfit_hold_time).timeout
+	player.hold_movement = false # carry on with the rest of the walk as the screen clears
+	t = create_tween()
+	t.tween_property(_fade, "color:a", 0.0, outfit_fade_time)
+	await t.finished
+	player.input_locked = false
+	_changing_outfit = false
+
+
+func _set_inside(inside: bool, fade: bool) -> void:
+	_player_inside = inside
+	var outfit := Player.Outfit.GINGER if inside else Player.Outfit.SPACESUIT
+	if not fade or player.skin == outfit:
+		player.skin = outfit
+		return
+	# he's standing still: dim -> change -> undim
+	_changing_outfit = true
+	var t := create_tween()
+	t.tween_property(_fade, "color:a", outfit_dim, outfit_fade_time)
+	await t.finished
+	player.skin = outfit
+	await get_tree().create_timer(outfit_hold_time).timeout
+	t = create_tween()
+	t.tween_property(_fade, "color:a", 0.0, outfit_fade_time)
+	await t.finished
+	_changing_outfit = false
 	if is_power_low():
 		_update_base_lights() # every frame, for the flicker
 

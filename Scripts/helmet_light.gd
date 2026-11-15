@@ -14,9 +14,14 @@ func _ready() -> void:
 
 # Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta: float) -> void:
-	if Input.is_action_just_pressed("helmet_light"):
+	# the light is part of the space suit's helmet: no suit (inside the base), no light
+	var suited := astronaut.skin == Player.Outfit.SPACESUIT
+	if Input.is_action_just_pressed("helmet_light") and suited and not astronaut.input_locked:
 		enabled = !enabled
 		circle_light.enabled = enabled
+	elif not suited and enabled:
+		enabled = false # switched off when the suit comes off
+		circle_light.enabled = false
 
 	var dir := Vector2(astronaut.facing)
 	if dir != Vector2.ZERO:

@@ -4,32 +4,62 @@ extends Node
 signal solid_changed(cell: Vector2i, solid: bool)
 
 @export var tile_map: TileMapLayer
+## Thin walls live on cell EDGES, painted in this layer: atlas tile (0,0) = wall on the
+## cell's top edge, (1,0) = left edge, (2,0) = both. (Bottom/right edges are the
+## neighbour's top/left.)
+@export var walls_layer: TileMapLayer
 
 const DIRS: Array[Vector2i] = [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]
 
 ## World border, in cells. Everything outside is solid: no walking, no pathing, Orbi
 ## can't float there either. Keep it well inside the painted ground so the camera never
 ## shows the edge of the map. Empty rect = no border.
-## Base spans roughly x -5..57, y -6..9; this leaves ~7 tiles of Mars around it.
-@export var playable_rect := Rect2i(-12, -13, 77, 30)
+## Base spans roughly x -5..57, y -6..9; this leaves ~10 tiles of Mars around it.
+@export var playable_rect := Rect2i(-15, -16, 83, 36)
 
+## Pathfinding runs on a DOUBLE-resolution grid so walls can sit between cells:
+##   cell (x, y)             -> node (2x+1, 2y+1)
+##   edge between two cells  -> the node in between them
+##   grid corners (even, even) are always solid
+## A wall just makes its edge node solid. Paths come back as plain cell paths.
 var astar := AStarGrid2D.new()
 var occupied := {} # for dynamic blockers like npc
+var cell_size: Vector2i
+var cells_rect: Rect2i # used rect of the tile map, in cells
+
+static func _node(cell: Vector2i) -> Vector2i:
+	return cell * 2 + Vector2i.ONE
+
+static func _edge(a: Vector2i, b: Vector2i) -> Vector2i:
+	return a + b + Vector2i.ONE # = midpoint of _node(a) and _node(b)
 
 func _ready() -> void:
-	print("hello world")
-	astar.region = tile_map.get_used_rect()
-	astar.cell_size = tile_map.tile_set.tile_size
+	cell_size = tile_map.tile_set.tile_size
+	cells_rect = tile_map.get_used_rect()
+	astar.region = Rect2i(cells_rect.position * 2, cells_rect.size * 2 + Vector2i.ONE)
+	astar.cell_size = Vector2(cell_size) / 2.0
 	astar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
 	astar.update()
 
-	# for y in range(4, 8):
-	# 	for x in range(4, 8):
-	# 		astar.set_point_solid(Vector2i(x, y))
+	var r := astar.region
+	for y in range(r.position.y, r.end.y):
+		for x in range(r.position.x, r.end.x):
+			if x % 2 == 0 and y % 2 == 0:
+				astar.set_point_solid(Vector2i(x, y)) # grid corners: never walkable
+
+	# legacy: any tile still flagged "solid" blocks its whole cell
 	for cell in tile_map.get_used_cells():
 		var data := tile_map.get_cell_tile_data(cell)
 		if data and data.get_custom_data("solid"):
-			astar.set_point_solid(cell)
+			astar.set_point_solid(_node(cell))
+
+	if walls_layer:
+		for cell in walls_layer.get_used_cells():
+			var ac := walls_layer.get_cell_atlas_coords(cell)
+			if ac.x == 0 or ac.x == 2:
+				set_wall(cell, cell + Vector2i.UP, true)
+			if ac.x == 1 or ac.x == 2:
+				set_wall(cell, cell + Vector2i.LEFT, true)
 
 	for node in get_tree().get_nodes_in_group("blockers"):
 		print(node)
@@ -37,15 +67,19 @@ func _ready() -> void:
 		if shape_node == null:
 			continue
 		for cell in get_shape_cells(shape_node):
-			if astar.is_in_boundsv(cell):
+			if astar.is_in_boundsv(_node(cell)):
+				set_solid(cell, true)
+
+	for prop in get_tree().get_nodes_in_group("props"):
+		for cell in get_rect_cells(prop.get_block_rect()):
+			if astar.is_in_boundsv(_node(cell)):
 				set_solid(cell, true)
 
 	if playable_rect.has_area():
-		var r := astar.region
-		for y in range(r.position.y, r.end.y):
-			for x in range(r.position.x, r.end.x):
+		for y in range(cells_rect.position.y, cells_rect.end.y):
+			for x in range(cells_rect.position.x, cells_rect.end.x):
 				if not playable_rect.has_point(Vector2i(x, y)):
-					astar.set_point_solid(Vector2i(x, y))
+					astar.set_point_solid(_node(Vector2i(x, y)))
 
 ## How many cells inside the border this cell is (0 = on the edge, negative = outside).
 func distance_to_border(cell: Vector2i) -> int:
@@ -56,13 +90,32 @@ func distance_to_border(cell: Vector2i) -> int:
 		mini(cell.y - playable_rect.position.y, playable_rect.end.y - 1 - cell.y))
 
 func is_solid(cell: Vector2i) -> bool:
-	return not astar.is_in_boundsv(cell) or astar.is_point_solid(cell)
+	var n := _node(cell)
+	return not astar.is_in_boundsv(n) or astar.is_point_solid(n)
+
+## True if a wall sits on the edge between two neighbouring cells.
+func has_wall(a: Vector2i, b: Vector2i) -> bool:
+	var e := _edge(a, b)
+	return not astar.is_in_boundsv(e) or astar.is_point_solid(e)
+
+func set_wall(a: Vector2i, b: Vector2i, on: bool) -> void:
+	var e := _edge(a, b)
+	if astar.is_in_boundsv(e):
+		astar.set_point_solid(e, on)
+
+## Can you walk from a to its 4-neighbour b? (b not blocked, no wall in between)
+func can_step(a: Vector2i, b: Vector2i) -> bool:
+	return not is_solid(b) and not has_wall(a, b)
 
 func is_free(cell: Vector2i) -> bool:
 	return not is_solid(cell) and not occupied.has(cell)
 
 func get_path_cells(from: Vector2i, to: Vector2i) -> Array[Vector2i]:
-	return straighten(astar.get_id_path(from, to))
+	var cells: Array[Vector2i] = []
+	for n in astar.get_id_path(_node(from), _node(to)):
+		if n.x % 2 != 0 and n.y % 2 != 0: # skip the edge nodes in between
+			cells.append(Vector2i((n.x - 1) / 2, (n.y - 1) / 2))
+	return straighten(cells)
 
 ## A* on a 4-way grid has many equally short routes and happily picks staircase ones
 ## (right, down, right, down...). This rewrites the path with as few turns as possible
@@ -94,10 +147,12 @@ func _l_route(a: Vector2i, b: Vector2i, heading: Vector2i) -> Array[Vector2i]:
 		var cells := _line(a, corner)
 		cells.append_array(_line(corner, b))
 		var ok := true
+		var prev := a
 		for c in cells:
-			if is_solid(c):
+			if not can_step(prev, c):
 				ok = false
 				break
+			prev = c
 		if ok:
 			return cells
 		horizontal_first = not horizontal_first
@@ -120,7 +175,7 @@ func cell_to_world(cell: Vector2i) -> Vector2:
 	return tile_map.to_global(tile_map.map_to_local(cell))
 
 func set_solid(cell: Vector2i, solid: bool) -> void:
-	astar.set_point_solid(cell, solid)
+	astar.set_point_solid(_node(cell), solid)
 	solid_changed.emit(cell, solid)
 
 func occupy(cell: Vector2i, who: Node) -> void:
@@ -138,8 +193,10 @@ func get_shape_cells(shape_node: CollisionShape2D) -> Array[Vector2i]:
 
 	# Bounding rect of the shape in global space (handles position, scale, rotation)
 	var local_rect := Rect2(-rect_shape.size * 0.5, rect_shape.size)
-	var rect := shape_node.global_transform * local_rect
+	return get_rect_cells(shape_node.global_transform * local_rect)
 
+## Cells whose centers lie inside a global-space rect.
+func get_rect_cells(rect: Rect2) -> Array[Vector2i]:
 	var a := world_to_cell(rect.position)
 	var b := world_to_cell(rect.end)
 
@@ -165,6 +222,7 @@ func get_perimeter_cells(cells: Array[Vector2i]) -> Array[Vector2i]:
 			if footprint.has(n) or seen.has(n):
 				continue
 			seen[n] = true
-			if is_free(n): # also rejects walls and out-of-bounds
+			# free, and not on the other side of a wall from the object
+			if is_free(n) and not has_wall(c, n):
 				result.append(n)
 	return result
